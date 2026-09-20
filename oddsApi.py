@@ -1,0 +1,306 @@
+"""OddsPapi client (https://oddspapi.io) built for a tight monthly quota.
+
+Every response is cached to disk and every live request is counted against a
+local monthly budget, so re-running the app never silently burns requests.
+
+Setup:
+    Put your key in a `.env` file next to this script (gitignored):
+
+        ODDSPAPI_KEY=your_key_here
+
+    or export it as an environment variable.
+"""
+
+import json
+import os
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+from collections.abc import Callable
+from typing import Any, cast
+
+import requests
+
+BASE_URL = "https://api.oddspapi.io/v4"
+API_KEY_ENV_VAR = "ODDSPAPI_KEY"
+MONTHLY_QUOTA = 250
+
+# American Football on OddsPapi. Hardcoded so we never spend requests on lookups.
+NFL_SPORT_ID = 14
+NFL_TOURNAMENT_ID = 31
+
+PROJECT_DIR = Path(__file__).resolve().parent
+CACHE_DIR = PROJECT_DIR / ".cache" / "odds"
+REQUEST_LOG = CACHE_DIR / "request_log.json"
+
+# Cache lifetimes. Reference data almost never changes; odds move constantly,
+# but with 250 requests/month we can only afford a handful of refreshes a week.
+TTL_FOREVER = None
+TTL_ODDS = 12 * 60 * 60  # 12 hours
+
+# Hook the UI can set to ask the user before a live request is made.
+# Signature: (description: str, remaining: int) -> bool
+ConfirmFn = Callable[[str, int], bool]
+confirm_request: ConfirmFn | None = None
+
+
+class OddsApiError(RuntimeError):
+    """Raised for missing keys, quota exhaustion, or API error responses."""
+
+
+# --------------------------------------------------------------------------- #
+# Key handling
+# --------------------------------------------------------------------------- #
+def _load_dotenv() -> None:
+    env_file = PROJECT_DIR / ".env"
+    if not env_file.exists():
+        return
+    for line in env_file.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        os.environ.setdefault(key.strip(), value.strip().strip("'\""))
+
+
+def _get_api_key() -> str:
+    _load_dotenv()
+    api_key = os.environ.get(API_KEY_ENV_VAR)
+    if not api_key:
+        raise OddsApiError(
+            f"Missing API key. Add {API_KEY_ENV_VAR}=... to a .env file "
+            "or export it as an environment variable."
+        )
+    return api_key
+
+
+# --------------------------------------------------------------------------- #
+# Quota tracking
+# --------------------------------------------------------------------------- #
+def _current_month() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m")
+
+
+def _empty_log() -> dict[str, Any]:
+    return {"month": _current_month(), "requests": []}
+
+
+def _read_log() -> dict[str, Any]:
+    if REQUEST_LOG.exists():
+        return cast(dict[str, Any], json.loads(REQUEST_LOG.read_text()))
+    return _empty_log()
+
+
+def _write_log(log: dict[str, Any]) -> None:
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    REQUEST_LOG.write_text(json.dumps(log, indent=2))
+
+
+def requests_used_this_month() -> int:
+    log = _read_log()
+    if log.get("month") != _current_month():
+        return 0
+    return len(log.get("requests", []))
+
+
+def requests_remaining() -> int:
+    return max(0, MONTHLY_QUOTA - requests_used_this_month())
+
+
+def _record_request(path: str, params: dict[str, Any]) -> None:
+    log = _read_log()
+    if log.get("month") != _current_month():
+        log = _empty_log()
+    safe_params = {k: v for k, v in params.items() if k != "apiKey"}
+    entries = cast(list[dict[str, Any]], list(log.get("requests", [])))
+    entries.append(
+        {"at": datetime.now(timezone.utc).isoformat(), "path": path, "params": safe_params}
+    )
+    log["requests"] = entries
+    _write_log(log)
+
+
+# --------------------------------------------------------------------------- #
+# Cached GET
+# --------------------------------------------------------------------------- #
+def _cache_path(path: str, params: dict[str, Any]) -> Path:
+    key_parts = [path.replace("/", "_")] + [
+        f"{k}-{v}" for k, v in sorted(params.items()) if k != "apiKey"
+    ]
+    return CACHE_DIR / ("__".join(str(p) for p in key_parts) + ".json")
+
+
+def _read_cache(cache_file: Path, ttl: int | None) -> Any | None:
+    if not cache_file.exists():
+        return None
+    if ttl is not None and time.time() - cache_file.stat().st_mtime > ttl:
+        return None
+    return json.loads(cache_file.read_text())
+
+
+def _get(
+    path: str,
+    params: dict[str, Any] | None = None,
+    ttl: int | None = TTL_ODDS,
+    force_refresh: bool = False,
+) -> Any:
+    """GET from OddsPapi, serving from disk cache whenever possible.
+
+    A live request is only made when the cache is missing/expired (or
+    force_refresh is set), the quota isn't exhausted, and the confirm hook
+    (if installed) says yes.
+    """
+    params = dict(params or {})
+    cache_file = _cache_path(path, params)
+
+    if not force_refresh:
+        cached = _read_cache(cache_file, ttl)
+        if cached is not None:
+            return cached
+
+    remaining = requests_remaining()
+    if remaining <= 0:
+        raise OddsApiError(
+            f"Monthly quota of {MONTHLY_QUOTA} requests exhausted. "
+            "Serving cached data only until next month."
+        )
+
+    if confirm_request is not None and not confirm_request(path, remaining):
+        # User declined; fall back to stale cache if any exists.
+        stale = _read_cache(cache_file, ttl=None)
+        if stale is not None:
+            return stale
+        raise OddsApiError("Request cancelled and no cached data available.")
+
+    params["apiKey"] = _get_api_key()
+    response = requests.get(f"{BASE_URL}/{path}", params=params, timeout=15)
+    _record_request(path, params)
+
+    if not response.ok:
+        raise OddsApiError(
+            f"OddsPapi '{path}' failed ({response.status_code}): {response.text}"
+        )
+
+    data = response.json()
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    cache_file.write_text(json.dumps(data))
+    return data
+
+
+def cache_age(path: str, params: dict[str, Any] | None = None) -> float | None:
+    """Seconds since the cached response for this request was written, or None."""
+    cache_file = _cache_path(path, dict(params or {}))
+    if not cache_file.exists():
+        return None
+    return time.time() - cache_file.stat().st_mtime
+
+
+# --------------------------------------------------------------------------- #
+# Reference data (fetched once, cached forever)
+# --------------------------------------------------------------------------- #
+def get_sports() -> list[dict[str, Any]]:
+    return cast(list[dict[str, Any]], _get("sports", ttl=TTL_FOREVER))
+
+
+def get_markets() -> list[dict[str, Any]]:
+    """Market definitions (id -> name). Needed to decode odds responses."""
+    return cast(list[dict[str, Any]], _get("markets", ttl=TTL_FOREVER))
+
+
+def get_bookmakers() -> list[dict[str, Any]]:
+    return cast(list[dict[str, Any]], _get("bookmakers", ttl=TTL_FOREVER))
+
+
+def get_tournaments(sport_id: int) -> list[dict[str, Any]]:
+    return cast(
+        list[dict[str, Any]],
+        _get("tournaments", {"sportId": sport_id}, ttl=TTL_FOREVER),
+    )
+
+
+def get_participants(sport_id: int) -> dict[int, str]:
+    """Team id -> name mapping for a sport.
+
+    OddsPapi returns a flat object: {"347948": "Team Name", ...}.
+    """
+    raw = cast(
+        dict[str, str],
+        _get("participants", {"sportId": sport_id}, ttl=TTL_FOREVER),
+    )
+    return {int(pid): name for pid, name in raw.items()}
+
+
+def find_nfl_tournament_id(sport_id: int = NFL_SPORT_ID) -> int:
+    """Look up the NFL tournamentId. Prefer NFL_TOURNAMENT_ID; this is a fallback."""
+    for t in get_tournaments(sport_id):
+        if str(t.get("tournamentSlug", "")).lower() == "nfl" or str(
+            t.get("tournamentName", "")
+        ).upper() == "NFL":
+            return int(t["tournamentId"])
+    raise OddsApiError("Could not find an NFL tournament for this sport.")
+
+
+# --------------------------------------------------------------------------- #
+# Odds (the one call that actually costs us regularly)
+# --------------------------------------------------------------------------- #
+def _odds_params(tournament_id: int, bookmaker: str, odds_format: str = "american") -> dict[str, Any]:
+    return {
+        "bookmaker": bookmaker,
+        "tournamentIds": str(tournament_id),
+        "oddsFormat": odds_format,
+    }
+
+
+def get_odds_by_tournament(
+    tournament_id: int,
+    bookmaker: str = "pinnacle",
+    odds_format: str = "american",
+    force_refresh: bool = False,
+) -> list[dict[str, Any]]:
+    """All upcoming fixtures + odds for a tournament from ONE bookmaker in ONE request."""
+    return cast(
+        list[dict[str, Any]],
+        _get(
+            "odds-by-tournaments",
+            _odds_params(tournament_id, bookmaker, odds_format),
+            ttl=TTL_ODDS,
+            force_refresh=force_refresh,
+        ),
+    )
+
+
+def odds_cache_age(tournament_id: int, bookmaker: str) -> float | None:
+    return cache_age("odds-by-tournaments", _odds_params(tournament_id, bookmaker))
+
+
+def get_odds_for_bookmakers(
+    tournament_id: int,
+    bookmakers: list[str],
+    force_refresh: bool = False,
+) -> tuple[list[dict[str, Any]], dict[str, str]]:
+    """Fetch each bookmaker (one request each) and merge them by fixture.
+
+    The API only accepts a single `bookmaker` per call, so N books = N requests
+    (cached independently). Returns (fixtures, errors) where `errors` maps a
+    bookmaker slug to the reason it was skipped, so one bad book doesn't sink
+    the whole report.
+    """
+    merged: dict[str, dict[str, Any]] = {}
+    errors: dict[str, str] = {}
+
+    for book in bookmakers:
+        try:
+            fixtures = get_odds_by_tournament(tournament_id, bookmaker=book, force_refresh=force_refresh)
+        except OddsApiError as exc:
+            errors[book] = str(exc)
+            continue
+        for fx in fixtures:
+            fid = str(fx.get("fixtureId"))
+            target = merged.get(fid)
+            if target is None:
+                target = dict(fx)
+                target["bookmakerOdds"] = {}
+                merged[fid] = target
+            target["bookmakerOdds"].update(fx.get("bookmakerOdds", {}))
+
+    return list(merged.values()), errors

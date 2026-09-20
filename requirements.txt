@@ -1,0 +1,8 @@
+nfl_data_py==0.3.3
+pandas==3.0.6
+numpy==2.5.3
+appdirs==1.4.4
+fastparquet==2026.5.0
+requests==2.34.2
+rich==15.0.0
+streamlit==1.64.0

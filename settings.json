@@ -1,0 +1,4 @@
+{
+  "bookmakers": ["pinnacle", "faketest"],
+  "primary_bookmaker": "pinnacle"
+}
