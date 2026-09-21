@@ -107,6 +107,62 @@ def requests_remaining() -> int:
     return max(0, MONTHLY_QUOTA - requests_used_this_month())
 
 
+def _last_logged_time() -> float | None:
+    """Timestamp (epoch seconds) of the most recent logged request, or None."""
+    log = _read_log()
+    if log.get("month") != _current_month():
+        return None
+    entries = cast(list[dict[str, Any]], log.get("requests", []))
+    if not entries:
+        return None
+    latest = max(entries, key=lambda e: e.get("at", ""))
+    try:
+        return datetime.fromisoformat(latest["at"]).timestamp()
+    except (KeyError, ValueError):
+        return None
+
+
+def find_untracked_cache_files() -> list[Path]:
+    """Odds cache files written *after* the last logged request.
+
+    Every live request made through this module logs itself before writing
+    its cache file, so a cache file newer than the most recent log entry
+    can only mean a request was made outside this app (e.g. a manual script
+    or curl call) and never counted against the quota. Surfacing these lets
+    the UI warn you and offer to reconcile the count.
+    """
+    if not CACHE_DIR.exists():
+        return []
+    last_logged = _last_logged_time()
+    if last_logged is None:
+        # No requests logged yet this month; any cache file is suspect.
+        return sorted(
+            p for p in CACHE_DIR.glob("*.json") if p.name != REQUEST_LOG.name
+        )
+    return sorted(
+        p
+        for p in CACHE_DIR.glob("*.json")
+        if p.name != REQUEST_LOG.name and p.stat().st_mtime > last_logged + 1
+    )
+
+
+def reconcile_untracked_requests() -> int:
+    """Log a manual-adjustment entry for each untracked cache file found.
+
+    Returns the number of entries added. Call this once you've confirmed
+    the untracked file(s) came from a real request against the live API
+    (not e.g. a file you copied in by hand), so the monthly count matches
+    what OddsPapi actually billed.
+    """
+    untracked = find_untracked_cache_files()
+    for cache_file in untracked:
+        _record_request(
+            "manual-adjustment",
+            {"note": f"untracked cache file reconciled: {cache_file.name}"},
+        )
+    return len(untracked)
+
+
 def _record_request(path: str, params: dict[str, Any]) -> None:
     log = _read_log()
     if log.get("month") != _current_month():

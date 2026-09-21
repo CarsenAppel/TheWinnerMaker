@@ -21,6 +21,22 @@ import oddsApi
 
 st.set_page_config(page_title="WinnerMaker", page_icon="", layout="wide")
 
+# Simple, slightly larger sans-serif font app-wide.
+st.markdown(
+    """
+    <style>
+    html, body, [class*="st-"], [class*="css-"] {
+        font-family: "Trebuchet MS", Verdana, sans-serif !important;
+        font-size: 18px !important;
+    }
+    h1 { font-size: 2.2rem !important; }
+    h2 { font-size: 1.8rem !important; }
+    h3 { font-size: 1.5rem !important; }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 # Paste your ASCII art back in here if you want it on the home page.
 SPLASH_IMAGE = ""
 
@@ -73,11 +89,167 @@ def to_df(items) -> pd.DataFrame:
 
 
 def show_table(items) -> None:
+
     df = to_df(items)
     try:
         st.dataframe(df, width="stretch", hide_index=True)
     except Exception:  # mixed / nested cell types
         st.dataframe(df.astype(str), width="stretch", hide_index=True)
+
+
+def _lines_text(c: analysis.PlayerCandidate) -> str:
+    parts = []
+    for m in analysis.PROJECTION_MARKETS:
+        if m in c.props:
+            parts.append(f"{analysis.PROP_LABELS[m]} {c.props[m].line:g}")
+    if c.td_probability is not None:
+        parts.append(f"TD {c.td_probability:.0%}")
+    return "  ".join(parts) if parts else "-"
+
+
+# --------------------------------------------------------------------------- #
+# Odds analysis - colored DataFrames
+# --------------------------------------------------------------------------- #
+TAG_COLORS = {
+    "BLOWOUT RISK": "color: #ff4b4b; font-weight: 600",
+    "COIN FLIP": "color: #29b5e8; font-weight: 600",
+    "SHOOTOUT": "color: #21c354; font-weight: 600",
+    "LOW SCORING": "color: #d4a017; font-weight: 600",
+}
+
+
+def _tag_style(val: str) -> str:
+    return TAG_COLORS.get(val, "color: gray")
+
+
+def _price_style(val: str) -> str:
+    if not val or val in ("-", "n/a"):
+        return "color: gray"
+    return "color: #21c354" if val.startswith("+") else "color: #ff4b4b"
+
+
+def _lean_text(value: float) -> str:
+    if value >= analysis.SKEW_THRESHOLD:
+        return f"OVER {value:.0%}"
+    if value <= -analysis.SKEW_THRESHOLD:
+        return f"UNDER {abs(value):.0%}"
+    return "-"
+
+
+def _lean_style(val: str) -> str:
+    if val.startswith("OVER"):
+        return "color: #21c354"
+    if val.startswith("UNDER"):
+        return "color: #ff4b4b"
+    return "color: gray"
+
+
+def game_signals_df(signals: list[analysis.GameSignal]) -> pd.DataFrame:
+    rows = []
+    for s in signals:
+        fav_prob = max(s.home_prob, s.away_prob)
+        labels = s.labels
+        spread_tag = next((l for l in labels if l in ("BLOWOUT RISK", "COIN FLIP")), "-")
+        total_tag = next((l for l in labels if l in ("SHOOTOUT", "LOW SCORING")), "-")
+        rows.append(
+            {
+                "Date": s.start_time[:10],
+                "Away": s.away,
+                "Home": s.home,
+                "Home Spread": f"{s.home_spread:+.1f}" if s.home_spread is not None else "-",
+                "O/U": f"{s.total:.1f}" if s.total is not None else "-",
+                "Favorite": s.favorite,
+                "Win %": f"{fav_prob:.0%}" if fav_prob else "-",
+                "Spread Signal": spread_tag,
+                "Total Signal": total_tag,
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def style_games_df(df: pd.DataFrame):
+    return df.style.map(_tag_style, subset=["Spread Signal", "Total Signal"])
+
+
+def projections_df(props: list[analysis.PropLine], per_market: int = 12) -> pd.DataFrame:
+    rows = []
+    for mtype in analysis.PROJECTION_MARKETS:
+        for p in analysis.top_projections(props, mtype, per_market):
+            rows.append(
+                {
+                    "Market": analysis.PROP_LABELS[mtype],
+                    "Player": apiConnect.display_player_name(p.player),
+                    "Line": f"{p.line:.1f}",
+                    "Over": p.over_american or "-",
+                    "Under": p.under_american or "-",
+                    "Lean": _lean_text(p.lean),
+                    "Matchup": display.short_matchup(p.matchup),
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def style_projections_df(df: pd.DataFrame):
+    return (
+        df.style.map(_price_style, subset=["Over", "Under"]).map(_lean_style, subset=["Lean"])
+    )
+
+
+def td_scorers_df(props: list[analysis.PropLine], limit: int = 20) -> pd.DataFrame:
+    rows = [
+        {
+            "#": i,
+            "Player": apiConnect.display_player_name(p.player),
+            "TD %": f"{p.td_probability:.0%}",
+            "Price": p.over_american or "-",
+            "Matchup": display.short_matchup(p.matchup),
+        }
+        for i, p in enumerate(analysis.top_td_scorers(props, limit), 1)
+    ]
+    return pd.DataFrame(rows)
+
+
+def style_td_df(df: pd.DataFrame):
+    return df.style.map(_price_style, subset=["Price"])
+
+
+def skew_df(props: list[analysis.PropLine], limit: int = 20) -> pd.DataFrame:
+    rows = [
+        {
+            "Player": apiConnect.display_player_name(p.player),
+            "Market": p.label,
+            "Line": f"{p.line:.1f}",
+            "Lean": _lean_text(p.lean),
+            "Over": p.over_american or "-",
+            "Under": p.under_american or "-",
+            "Matchup": display.short_matchup(p.matchup),
+        }
+        for p in analysis.skewed_lines(props, limit)
+    ]
+    return pd.DataFrame(rows)
+
+
+def style_skew_df(df: pd.DataFrame):
+    return df.style.map(_lean_style, subset=["Lean"]).map(_price_style, subset=["Over", "Under"])
+
+
+def add_drop_df(rows: list[analysis.PlayerCandidate]) -> pd.DataFrame:
+    """Add/drop candidates as a DataFrame (one row per player)."""
+    return pd.DataFrame(
+        [
+            {
+                "Player": c.player,
+                "Pos": c.position or "?",
+                "Team": c.team or "?",
+                "Score": round(c.score, 1),
+                "Adj": round(c.adjustment, 1),
+                "Book lines": _lines_text(c),
+                "Matchup": display.short_matchup(c.matchup),
+                "Why": "; ".join(c.reasons) if c.reasons else "-",
+            }
+            for c in rows
+        ]
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -125,6 +297,18 @@ def sidebar_quota() -> None:
     total = oddsApi.MONTHLY_QUOTA
     st.sidebar.metric("Odds API requests this month", f"{used} / {total}")
     st.sidebar.progress(min(used / total, 1.0) if total else 0.0)
+
+    untracked = oddsApi.find_untracked_cache_files()
+    if untracked:
+        st.sidebar.warning(
+            f"{len(untracked)} odds-cache file(s) look like they came from "
+            "requests made outside this app, so they aren't counted above. "
+            "Always fetch odds through this app so the quota stays accurate."
+        )
+        if st.sidebar.button("Reconcile untracked requests"):
+            added = oddsApi.reconcile_untracked_requests()
+            st.sidebar.success(f"Logged {added} untracked request(s).")
+            st.rerun()
 
 
 # --------------------------------------------------------------------------- #
@@ -306,17 +490,29 @@ def odds_page() -> None:
 
     tabs = st.tabs(["Games", "Projections", "TD scorers", "Skew"])
     with tabs[0]:
-        show_report(display.game_report, odds.games)
-        with st.expander("Raw data"):
-            show_table(odds.games)
+        df = game_signals_df(odds.games)
+        if df.empty:
+            st.info("No full-game markets found in the fetched fixtures.")
+        else:
+            st.dataframe(style_games_df(df), width="stretch", hide_index=True)
     with tabs[1]:
-        show_report(display.projection_report, odds.props)
-        with st.expander("Raw data"):
-            show_table(odds.props)
+        df = projections_df(odds.props)
+        if df.empty:
+            st.info("No player props in the fetched data for this bookmaker.")
+        else:
+            st.dataframe(style_projections_df(df), width="stretch", hide_index=True)
     with tabs[2]:
-        show_report(display.td_report, odds.props)
+        df = td_scorers_df(odds.props)
+        if df.empty:
+            st.info("No anytime-TD odds in the fetched data.")
+        else:
+            st.dataframe(style_td_df(df), width="stretch", hide_index=True)
     with tabs[3]:
-        show_report(display.skew_report, odds.props)
+        df = skew_df(odds.props)
+        if df.empty:
+            st.info("Skewed lines: no main lines priced far from even right now.")
+        else:
+            st.dataframe(style_skew_df(df), width="stretch", hide_index=True)
 
 
 def player_search_page() -> None:
@@ -380,7 +576,28 @@ def add_drop_page() -> None:
     name = name.strip() or None
 
     adds, drops = analysis.select_add_drop(candidates, position, team, name)
-    show_report(display.add_drop_report, adds, drops, day, analysis.describe_filters(position, team, name))
+
+    filters = analysis.describe_filters(position, team, name)
+    if filters:
+        st.caption(f"Filters: {filters}")
+
+    if not adds:
+        st.warning("No players with props matched those filters.")
+        return
+
+    st.subheader(f"ADD / START candidates (top {len(adds)})")
+    st.dataframe(add_drop_df(adds), width="stretch", hide_index=True)
+
+    st.subheader("DROP / FADE candidates")
+    if drops:
+        st.dataframe(add_drop_df(drops), width="stretch", hide_index=True)
+    else:
+        st.info("No drop/fade candidates flagged.")
+
+    st.caption(
+        "Score = book-implied fantasy pts (half-PPR, 6/TD) + Adj, where Adj sums "
+        "game-script and line-lean adjustments."
+    )
 
 
 def team_page() -> None:
@@ -441,4 +658,5 @@ def main() -> None:
     st.navigation(pages).run()
 
 
-main()
+if __name__ == "__main__":
+    main()
