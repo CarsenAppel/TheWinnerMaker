@@ -2,6 +2,7 @@
 
 Run with:  streamlit run main.py
 """
+
 from __future__ import annotations
 
 import contextlib
@@ -190,9 +191,7 @@ def projections_df(props: list[analysis.PropLine], per_market: int = 12) -> pd.D
 
 
 def style_projections_df(df: pd.DataFrame):
-    return (
-        df.style.map(_price_style, subset=["Over", "Under"]).map(_lean_style, subset=["Lean"])
-    )
+    return df.style.map(_price_style, subset=["Over", "Under"]).map(_lean_style, subset=["Lean"])
 
 
 def td_scorers_df(props: list[analysis.PropLine], limit: int = 20) -> pd.DataFrame:
@@ -472,8 +471,10 @@ def home_page() -> None:
     if SPLASH_IMAGE:
         with st.expander("🏆", expanded=False):
             st.code(SPLASH_IMAGE, language=None)
-    st.write("Use the sidebar to open the odds report, search a player, browse the week's games, "
-             "or manage your team.")
+    st.write(
+        "Use the sidebar to open the odds report, search a player, browse the week's games, "
+        "or manage your team."
+    )
 
 
 def odds_page() -> None:
@@ -486,7 +487,9 @@ def odds_page() -> None:
     if odds is None:
         return
     if odds.age_seconds is not None:
-        st.caption(f"Odds data is {odds.age_seconds / 3600:.1f} hours old ({odds.fixture_count} fixtures).")
+        st.caption(
+            f"Odds data is {odds.age_seconds / 3600:.1f} hours old ({odds.fixture_count} fixtures)."
+        )
 
     tabs = st.tabs(["Games", "Projections", "TD scorers", "Skew"])
     with tabs[0]:

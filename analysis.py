@@ -20,11 +20,11 @@ from typing import Any
 # --------------------------------------------------------------------------- #
 # Thresholds
 # --------------------------------------------------------------------------- #
-BLOWOUT_SPREAD = 9.5      # |spread| at/above this -> starters may rest late
-COIN_FLIP_SPREAD = 2.5    # |spread| at/below this -> full-game usage both sides
+BLOWOUT_SPREAD = 9.5  # |spread| at/above this -> starters may rest late
+COIN_FLIP_SPREAD = 2.5  # |spread| at/below this -> full-game usage both sides
 SHOOTOUT_TOTAL = 50.0
 LOW_SCORING_TOTAL = 40.5
-SKEW_THRESHOLD = 0.08     # |over_prob - under_prob| on a main line worth flagging
+SKEW_THRESHOLD = 0.08  # |over_prob - under_prob| on a main line worth flagging
 
 # OddsPapi marketType values we care about (sportId 14)
 MONEYLINE = "moneyline"
@@ -67,7 +67,7 @@ TD_POINTS = 6.0
 # Score nudges for the add/drop search (in fantasy-point-equivalents).
 BONUS_SHOOTOUT = 2.0
 BONUS_COIN_FLIP = 1.0
-BONUS_GARBAGE_TIME = 1.0      # underdog pass-catcher in a projected blowout
+BONUS_GARBAGE_TIME = 1.0  # underdog pass-catcher in a projected blowout
 BONUS_LEAN_OVER = 1.5
 PENALTY_LOW_SCORING = -2.0
 PENALTY_BLOWOUT_FAVORITE = -2.0
@@ -148,7 +148,7 @@ class OddsRow:
     outcome_id: str
     outcome_name: str
     player: str | None
-    price: float          # decimal
+    price: float  # decimal
     price_american: str
     main_line: bool
 
@@ -187,7 +187,7 @@ class GameSignal:
     away: str
     home_prob: float = 0.0
     away_prob: float = 0.0
-    home_spread: float | None = None   # negative = home favored
+    home_spread: float | None = None  # negative = home favored
     total: float | None = None
 
     @property
@@ -309,8 +309,12 @@ class PropLine:
     @property
     def all_books(self) -> list[BookPrice]:
         primary = BookPrice(
-            self.bookmaker, self.line, self.over_price, self.under_price,
-            self.over_american, self.under_american,
+            self.bookmaker,
+            self.line,
+            self.over_price,
+            self.under_price,
+            self.over_american,
+            self.under_american,
         )
         return [primary, *self.other_books]
 
@@ -426,7 +430,14 @@ def extract_prop_lines_multi(
                 merged[k] = p
             elif book != merged[k].bookmaker:
                 merged[k].other_books.append(
-                    BookPrice(book, p.line, p.over_price, p.under_price, p.over_american, p.under_american)
+                    BookPrice(
+                        book,
+                        p.line,
+                        p.over_price,
+                        p.under_price,
+                        p.over_american,
+                        p.under_american,
+                    )
                 )
     return list(merged.values())
 
@@ -577,7 +588,9 @@ def build_candidates(
     return list(by_player.values())
 
 
-def _matches(cand: PlayerCandidate, position: str | None, team: str | None, name: str | None) -> bool:
+def _matches(
+    cand: PlayerCandidate, position: str | None, team: str | None, name: str | None
+) -> bool:
     if position and cand.position != position:
         return False
     if team and cand.team != team:
@@ -587,7 +600,7 @@ def _matches(cand: PlayerCandidate, position: str | None, team: str | None, name
     return True
 
 
-DROP_SCORE_CEILING = 8.0   # below this many implied points a player is a fade regardless of script
+DROP_SCORE_CEILING = 8.0  # below this many implied points a player is a fade regardless of script
 
 
 def select_add_drop(
@@ -637,6 +650,7 @@ def search_players(candidates: list[PlayerCandidate], query: str) -> list[Player
 
 def describe_filters(position: str | None, team: str | None, name: str | None) -> str:
     return ", ".join(
-        f for f in (position and f"pos={position}", team and f"team={team}", name and f"name~{name}")
+        f
+        for f in (position and f"pos={position}", team and f"team={team}", name and f"name~{name}")
         if f
     )

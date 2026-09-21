@@ -105,7 +105,13 @@ def banner(splash: str, header: str) -> None:
 
 def quota(used: int, total: int) -> None:
     remaining = total - used
-    style = "green" if remaining > total * 0.4 else "yellow" if remaining > total * 0.15 else "bold red"
+    style = (
+        "green"
+        if remaining > total * 0.4
+        else "yellow"
+        if remaining > total * 0.15
+        else "bold red"
+    )
     console.print(
         Text.assemble(
             ("OddsPapi quota: ", "dim"),
@@ -309,7 +315,11 @@ def _reasons_cell(c: analysis.PlayerCandidate) -> Text:
     for i, reason in enumerate(c.reasons):
         if i:
             out.append("\n")
-        style = "red" if ("UNDER" in reason or "low-scoring" in reason or "rest" in reason) else "green"
+        style = (
+            "red"
+            if ("UNDER" in reason or "low-scoring" in reason or "rest" in reason)
+            else "green"
+        )
         out.append(reason, style=style)
     return out
 
@@ -327,7 +337,10 @@ def _candidate_table(title: str, rows: list[analysis.PlayerCandidate], style: st
     table.add_column("Matchup", style="dim", no_wrap=True)
     table.add_column("Why", min_width=24)
     for i, c in enumerate(rows, 1):
-        adj = Text(f"{c.adjustment:+.1f}", style="green" if c.adjustment > 0 else "red" if c.adjustment < 0 else "dim")
+        adj = Text(
+            f"{c.adjustment:+.1f}",
+            style="green" if c.adjustment > 0 else "red" if c.adjustment < 0 else "dim",
+        )
         table.add_row(
             str(i),
             c.player,
@@ -372,7 +385,9 @@ def odds_status(ages: dict[str, float | None], primary: str, fixture_count: int)
         if book == primary:
             parts.append("*", style="bold")
         parts.append(f" {age / 3600:.1f}h" if age is not None else " fresh", style="dim")
-    console.print(Text.assemble(("Odds: ", "dim"), parts, (f"   ({fixture_count} fixtures)", "dim")))
+    console.print(
+        Text.assemble(("Odds: ", "dim"), parts, (f"   ({fixture_count} fixtures)", "dim"))
+    )
 
 
 def bookmaker_settings(cfg: settings.Settings) -> None:
@@ -385,7 +400,9 @@ def bookmaker_settings(cfg: settings.Settings) -> None:
         table.add_row(
             str(i),
             Text(book, style="bold" if primary else ""),
-            Text("primary - drives projections", style="green") if primary else Text("comparison", style="dim"),
+            Text("primary - drives projections", style="green")
+            if primary
+            else Text("comparison", style="dim"),
         )
     console.print(table)
     info(f"Each odds refresh costs {len(cfg.bookmakers)} request(s) - one per bookmaker.")
@@ -411,7 +428,9 @@ def line_shopping_report(props: list[analysis.PropLine]) -> None:
     if not props:
         info("Books agree on every main line right now.")
         return
-    table = _table("Line shopping - books posting different numbers", table_box=box.ROUNDED, show_lines=True)
+    table = _table(
+        "Line shopping - books posting different numbers", table_box=box.ROUNDED, show_lines=True
+    )
     table.add_column("Player", style="bold")
     table.add_column("Market")
     table.add_column("Spread", justify="right", style="bold yellow")
@@ -436,7 +455,9 @@ def line_shopping_report(props: list[analysis.PropLine]) -> None:
             short_matchup(p.matchup),
         )
     console.print(table)
-    info("Spread = highest minus lowest main line across books. A book posting a lower Over line (or higher Under) is the softer number.")
+    info(
+        "Spread = highest minus lowest main line across books. A book posting a lower Over line (or higher Under) is the softer number."
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -484,7 +505,10 @@ def player_card(c: analysis.PlayerCandidate, kickoff: str = "") -> None:
             _verdict(c),
             (f"   {c.score:.1f} pts", "bold"),
             (f"  ({c.projection:.1f} book-implied ", "dim"),
-            (f"{c.adjustment:+.1f}", "green" if c.adjustment > 0 else "red" if c.adjustment < 0 else "dim"),
+            (
+                f"{c.adjustment:+.1f}",
+                "green" if c.adjustment > 0 else "red" if c.adjustment < 0 else "dim",
+            ),
             (" adj)", "dim"),
         ),
     )
@@ -509,7 +533,13 @@ def player_card(c: analysis.PlayerCandidate, kickoff: str = "") -> None:
 
     for m in ordered:
         p = c.props[m]
-        row(p, p.label, f"{p.line:g}", _over_under(p.over_american, p.under_american), _lean(p.lean))
+        row(
+            p,
+            p.label,
+            f"{p.line:g}",
+            _over_under(p.over_american, p.under_american),
+            _lean(p.lean),
+        )
     if td and td.over_price:
         row(
             td,
@@ -523,7 +553,9 @@ def player_card(c: analysis.PlayerCandidate, kickoff: str = "") -> None:
     if c.reasons:
         body += ["", Text("Why", style="bold"), _reasons_cell(c)]
 
-    console.print(Panel(Group(*body), title=header, title_align="left", border_style="bright_white"))
+    console.print(
+        Panel(Group(*body), title=header, title_align="left", border_style="bright_white")
+    )
 
 
 def player_matches(hits: list[analysis.PlayerCandidate]) -> None:
@@ -536,7 +568,14 @@ def player_matches(hits: list[analysis.PlayerCandidate]) -> None:
     table.add_column("Score", justify="right")
     table.add_column("Matchup", style="dim")
     for i, c in enumerate(hits, 1):
-        table.add_row(str(i), c.player, _position(c.position), c.team or "?", f"{c.score:.1f}", short_matchup(c.matchup))
+        table.add_row(
+            str(i),
+            c.player,
+            _position(c.position),
+            c.team or "?",
+            f"{c.score:.1f}",
+            short_matchup(c.matchup),
+        )
     console.print(table)
 
 

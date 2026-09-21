@@ -20,7 +20,7 @@ import pandas as pd
 
 PROJECT_DIR = Path(__file__).resolve().parent
 CACHE_DIR = PROJECT_DIR / ".cache" / "nfl"
-TTL_SCHEDULE = 6 * 60 * 60      # results fill in after games; refresh a few times a day
+TTL_SCHEDULE = 6 * 60 * 60  # results fill in after games; refresh a few times a day
 TTL_ROSTERS = 24 * 60 * 60
 TTL_FOREVER = None
 
@@ -79,7 +79,9 @@ def _is_missing(value: Any) -> bool:
 # --------------------------------------------------------------------------- #
 def get_schedule(season: int = SEASON) -> pd.DataFrame:
     """Game schedule for a season (gameday/gametime are US Eastern)."""
-    return _cached_frame(f"schedule_{season}", TTL_SCHEDULE, lambda: nfl.import_schedules([season]))
+    return _cached_frame(
+        f"schedule_{season}", TTL_SCHEDULE, lambda: nfl.import_schedules([season])
+    )
 
 
 def get_rosters(season: int = SEASON) -> pd.DataFrame:
@@ -128,12 +130,12 @@ def get_weekly_stats(season: int = SEASON) -> pd.DataFrame:
 class ScheduledGame:
     game_id: str
     week: int
-    gameday: str      # YYYY-MM-DD
-    weekday: str      # e.g. "Sunday"
-    gametime: str     # HH:MM Eastern
-    away: str         # abbreviation
+    gameday: str  # YYYY-MM-DD
+    weekday: str  # e.g. "Sunday"
+    gametime: str  # HH:MM Eastern
+    away: str  # abbreviation
     home: str
-    away_name: str    # full name, matches OddsPapi participants
+    away_name: str  # full name, matches OddsPapi participants
     home_name: str
 
     @property
@@ -149,7 +151,16 @@ def upcoming_week_games(season: int = SEASON, today: date | None = None) -> list
     """
     today = today or datetime.now().date()
     names = get_team_names()
-    columns = ["game_id", "week", "gameday", "weekday", "gametime", "away_team", "home_team", "result"]
+    columns = [
+        "game_id",
+        "week",
+        "gameday",
+        "weekday",
+        "gametime",
+        "away_team",
+        "home_team",
+        "result",
+    ]
 
     unplayed = [
         row
@@ -236,7 +247,7 @@ def display_player_name(name: str) -> str:
 
 @dataclass(frozen=True)
 class PlayerInfo:
-    team: str        # abbreviation
+    team: str  # abbreviation
     position: str
 
 

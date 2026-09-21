@@ -14,9 +14,9 @@ Setup:
 import json
 import os
 import time
+from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
-from collections.abc import Callable
 from typing import Any, cast
 
 import requests
@@ -136,9 +136,7 @@ def find_untracked_cache_files() -> list[Path]:
     last_logged = _last_logged_time()
     if last_logged is None:
         # No requests logged yet this month; any cache file is suspect.
-        return sorted(
-            p for p in CACHE_DIR.glob("*.json") if p.name != REQUEST_LOG.name
-        )
+        return sorted(p for p in CACHE_DIR.glob("*.json") if p.name != REQUEST_LOG.name)
     return sorted(
         p
         for p in CACHE_DIR.glob("*.json")
@@ -233,9 +231,7 @@ def _get(
     _record_request(path, params)
 
     if not response.ok:
-        raise OddsApiError(
-            f"OddsPapi '{path}' failed ({response.status_code}): {response.text}"
-        )
+        raise OddsApiError(f"OddsPapi '{path}' failed ({response.status_code}): {response.text}")
 
     data = response.json()
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
@@ -289,9 +285,10 @@ def get_participants(sport_id: int) -> dict[int, str]:
 def find_nfl_tournament_id(sport_id: int = NFL_SPORT_ID) -> int:
     """Look up the NFL tournamentId. Prefer NFL_TOURNAMENT_ID; this is a fallback."""
     for t in get_tournaments(sport_id):
-        if str(t.get("tournamentSlug", "")).lower() == "nfl" or str(
-            t.get("tournamentName", "")
-        ).upper() == "NFL":
+        if (
+            str(t.get("tournamentSlug", "")).lower() == "nfl"
+            or str(t.get("tournamentName", "")).upper() == "NFL"
+        ):
             return int(t["tournamentId"])
     raise OddsApiError("Could not find an NFL tournament for this sport.")
 
@@ -299,7 +296,9 @@ def find_nfl_tournament_id(sport_id: int = NFL_SPORT_ID) -> int:
 # --------------------------------------------------------------------------- #
 # Odds (the one call that actually costs us regularly)
 # --------------------------------------------------------------------------- #
-def _odds_params(tournament_id: int, bookmaker: str, odds_format: str = "american") -> dict[str, Any]:
+def _odds_params(
+    tournament_id: int, bookmaker: str, odds_format: str = "american"
+) -> dict[str, Any]:
     return {
         "bookmaker": bookmaker,
         "tournamentIds": str(tournament_id),
@@ -346,7 +345,9 @@ def get_odds_for_bookmakers(
 
     for book in bookmakers:
         try:
-            fixtures = get_odds_by_tournament(tournament_id, bookmaker=book, force_refresh=force_refresh)
+            fixtures = get_odds_by_tournament(
+                tournament_id, bookmaker=book, force_refresh=force_refresh
+            )
         except OddsApiError as exc:
             errors[book] = str(exc)
             continue
