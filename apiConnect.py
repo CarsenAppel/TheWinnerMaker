@@ -143,14 +143,7 @@ class ScheduledGame:
         return f"{self.away_name} @ {self.home_name}"
 
 
-def upcoming_week_games(season: int = SEASON, today: date | None = None) -> list[ScheduledGame]:
-    """All games in the earliest week that still has unplayed games.
-
-    A game counts as unplayed when it has no result yet and its date is today
-    or later, so a Sunday slate stays available all day Sunday.
-    """
-    today = today or datetime.now().date()
-    names = get_team_names()
+def _unplayed_games(season: int, today: date) -> list[Record]:
     columns = [
         "game_id",
         "week",
@@ -161,22 +154,20 @@ def upcoming_week_games(season: int = SEASON, today: date | None = None) -> list
         "home_team",
         "result",
     ]
-
-    unplayed = [
+    return [
         row
         for row in _records(get_schedule(season), columns)
         if _is_missing(row["result"]) and str(row["gameday"]) >= today.isoformat()
     ]
-    if not unplayed:
-        return []
-    week = min(int(row["week"]) for row in unplayed)
-    rows = sorted(
-        (row for row in unplayed if int(row["week"]) == week),
+
+
+def _games_for_week(rows: list[Record], week: int, names: dict[str, str]) -> list[ScheduledGame]:
+    week_rows = sorted(
+        (row for row in rows if int(row["week"]) == week),
         key=lambda row: (str(row["gameday"]), str(row["gametime"])),
     )
-
     games: list[ScheduledGame] = []
-    for row in rows:
+    for row in week_rows:
         away, home = str(row["away_team"]), str(row["home_team"])
         games.append(
             ScheduledGame(
@@ -192,6 +183,39 @@ def upcoming_week_games(season: int = SEASON, today: date | None = None) -> list
             )
         )
     return games
+
+
+def upcoming_weeks(season: int = SEASON, today: date | None = None) -> list[int]:
+    """Every week number (ascending) that still has at least one unplayed game.
+
+    Lets callers offer a "look ahead N weeks" choice without guessing how far
+    out the published schedule goes.
+    """
+    today = today or datetime.now().date()
+    unplayed = _unplayed_games(season, today)
+    return sorted({int(row["week"]) for row in unplayed})
+
+
+def upcoming_week_games(
+    season: int = SEASON, today: date | None = None, week_offset: int = 0
+) -> list[ScheduledGame]:
+    """All games in the week `week_offset` weeks after the earliest unplayed week.
+
+    A game counts as unplayed when it has no result yet and its date is today
+    or later, so a Sunday slate stays available all day Sunday. `week_offset=0`
+    (the default) is the current/next upcoming week; `week_offset=1` is the
+    week after that, and so on, capped at the last week with scheduled games.
+    """
+    today = today or datetime.now().date()
+    names = get_team_names()
+    unplayed = _unplayed_games(season, today)
+    if not unplayed:
+        return []
+
+    weeks = sorted({int(row["week"]) for row in unplayed})
+    index = min(max(week_offset, 0), len(weeks) - 1)
+    week = weeks[index]
+    return _games_for_week(unplayed, week, names)
 
 
 def games_by_day(games: list[ScheduledGame]) -> dict[str, list[ScheduledGame]]:

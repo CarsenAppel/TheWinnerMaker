@@ -82,7 +82,7 @@ def _current_month() -> str:
 
 
 def _empty_log() -> dict[str, Any]:
-    return {"month": _current_month(), "requests": []}
+    return {"month": _current_month(), "requests": [], "manual_adjustment": 0, "adjustments": []}
 
 
 def _read_log() -> dict[str, Any]:
@@ -103,8 +103,59 @@ def requests_used_this_month() -> int:
     return len(log.get("requests", []))
 
 
+def manual_adjustment_this_month() -> int:
+    """Net manual adjustment applied to this month's count (can be negative)."""
+    log = _read_log()
+    if log.get("month") != _current_month():
+        return 0
+    return int(log.get("manual_adjustment", 0))
+
+
+def adjustment_history_this_month() -> list[dict[str, Any]]:
+    """Audit trail of manual adjustments made this month, oldest first."""
+    log = _read_log()
+    if log.get("month") != _current_month():
+        return []
+    return cast(list[dict[str, Any]], list(log.get("adjustments", [])))
+
+
+def adjust_usage(delta: int, note: str = "") -> int:
+    """Manually nudge this month's usage count by `delta` (+/-).
+
+    This sits on top of the automatic per-request counting below and never
+    touches the `requests` log, so the existing counting logic (and the
+    untracked-file reconciliation it powers) keeps working unchanged. Use
+    this to correct the displayed total when it drifts from what the
+    provider actually billed (e.g. a request that failed on their end but
+    still consumed quota, or a correction after the fact).
+
+    Returns the new total usage for the month (auto-counted + adjustments).
+    """
+    log = _read_log()
+    if log.get("month") != _current_month():
+        log = _empty_log()
+
+    current_adjustment = int(log.get("manual_adjustment", 0))
+    log["manual_adjustment"] = current_adjustment + delta
+
+    history = cast(list[dict[str, Any]], list(log.get("adjustments", [])))
+    history.append(
+        {
+            "at": datetime.now(timezone.utc).isoformat(),
+            "delta": delta,
+            "note": note,
+            "total_after": log["manual_adjustment"],
+        }
+    )
+    log["adjustments"] = history
+
+    _write_log(log)
+    return requests_used_this_month() + log["manual_adjustment"]
+
+
 def requests_remaining() -> int:
-    return max(0, MONTHLY_QUOTA - requests_used_this_month())
+    total_used = requests_used_this_month() + manual_adjustment_this_month()
+    return max(0, MONTHLY_QUOTA - total_used)
 
 
 def _last_logged_time() -> float | None:

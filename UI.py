@@ -292,9 +292,14 @@ def report_odds_error(exc: Exception) -> None:
 
 
 def sidebar_quota() -> None:
-    used = oddsApi.requests_used_this_month()
+    auto_used = oddsApi.requests_used_this_month()
+    adjustment = oddsApi.manual_adjustment_this_month()
+    used = auto_used + adjustment
     total = oddsApi.MONTHLY_QUOTA
-    st.sidebar.metric("Odds API requests this month", f"{used} / {total}")
+    label = "Odds API requests this month"
+    if adjustment:
+        label += f" ({auto_used} tracked {'+' if adjustment > 0 else ''}{adjustment} adjusted)"
+    st.sidebar.metric(label, f"{used} / {total}")
     st.sidebar.progress(min(used / total, 1.0) if total else 0.0)
 
     untracked = oddsApi.find_untracked_cache_files()
@@ -308,6 +313,26 @@ def sidebar_quota() -> None:
             added = oddsApi.reconcile_untracked_requests()
             st.sidebar.success(f"Logged {added} untracked request(s).")
             st.rerun()
+
+    with st.sidebar.expander("Manually adjust count"):
+        st.caption(
+            "Nudge this month's count without touching the automatic "
+            "per-request log. Use this to correct drift from what the "
+            "provider actually billed."
+        )
+        delta = st.number_input("Adjustment", value=0, step=1, key="manual_adjust_delta")
+        note = st.text_input("Note (optional)", key="manual_adjust_note")
+        if st.button("Apply adjustment") and delta:
+            new_total = oddsApi.adjust_usage(int(delta), note)
+            st.success(f"Applied {delta:+d}. New total: {new_total} / {total}.")
+            st.rerun()
+
+        history = oddsApi.adjustment_history_this_month()
+        if history:
+            st.caption("Adjustment history:")
+            for entry in reversed(history):
+                note_suffix = f" — {entry['note']}" if entry.get("note") else ""
+                st.caption(f"{entry['at']}: {entry['delta']:+d}{note_suffix}")
 
 
 # --------------------------------------------------------------------------- #
@@ -346,8 +371,13 @@ def _cached_odds() -> OddsData:
 
 
 @st.cache_resource(ttl=3600)
-def _week_games():
-    return apiConnect.upcoming_week_games()
+def _week_games(week_offset: int = 0):
+    return apiConnect.upcoming_week_games(week_offset=week_offset)
+
+
+@st.cache_resource(ttl=3600)
+def _upcoming_weeks():
+    return apiConnect.upcoming_weeks()
 
 
 @st.cache_resource(ttl=6 * 3600)
@@ -406,7 +436,7 @@ def refresh_odds() -> None:
 
 @st.dialog("Force refresh odds?")
 def confirm_refresh_dialog() -> None:
-    remaining = oddsApi.MONTHLY_QUOTA - oddsApi.requests_used_this_month()
+    remaining = oddsApi.requests_remaining()
     st.write(f"This spends a request from your monthly quota ({remaining} remaining).")
     c1, c2 = st.columns(2)
     if c1.button("Refresh", type="primary", width="stretch"):
@@ -415,9 +445,23 @@ def confirm_refresh_dialog() -> None:
         st.rerun()
 
 
-def get_week_games():
+def week_ahead_picker(key: str) -> int:
+    """Radio to look 0..N weeks ahead of the current upcoming week."""
     try:
-        games = _week_games()
+        weeks = _upcoming_weeks()
+    except apiConnect.NflDataError as exc:
+        st.error(str(exc))
+        return 0
+    if len(weeks) <= 1:
+        return 0
+    labels = ["This week" if i == 0 else f"+{i} week(s) (Week {w})" for i, w in enumerate(weeks)]
+    choice = st.radio("Look ahead", labels, horizontal=True, key=key)
+    return labels.index(choice)
+
+
+def get_week_games(week_offset: int = 0):
+    try:
+        games = _week_games(week_offset)
     except apiConnect.NflDataError as exc:
         st.error(str(exc))
         return None
@@ -428,7 +472,8 @@ def get_week_games():
 
 
 def pick_game_day(key: str):
-    week_games = get_week_games()
+    week_offset = week_ahead_picker(f"{key}_weekahead")
+    week_games = get_week_games(week_offset)
     if week_games is None:
         return None
     by_day = apiConnect.games_by_day(week_games)
@@ -520,7 +565,8 @@ def odds_page() -> None:
 
 def player_search_page() -> None:
     st.header("Player search")
-    week_games = get_week_games()
+    week_offset = week_ahead_picker("playersearch_weekahead")
+    week_games = get_week_games(week_offset)
     if not week_games:
         return
     built = get_candidates({g.matchup for g in week_games}, label=f"week {week_games[0].week}")
