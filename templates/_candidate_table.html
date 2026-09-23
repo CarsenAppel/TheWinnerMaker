@@ -1,0 +1,26 @@
+{% macro candidate_table(title, rows) %}
+  <table>
+    <caption>{{ title }}</caption>
+    <thead>
+      <tr>
+        <th>#</th><th>Player</th><th>Pos</th><th>Team</th><th>Score</th><th>Adj</th>
+        <th>Book lines</th><th>Matchup</th><th>Why</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in rows %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td><strong>{{ c.player }}</strong></td>
+          <td class="{{ c.position | pos_class }}">{{ c.position or "?" }}</td>
+          <td>{{ c.team or "?" }}</td>
+          <td>{{ "%.1f" | format(c.score) }}</td>
+          <td><span class="{{ c.adjustment | adj_class }}">{{ "%+.1f" | format(c.adjustment) }}</span></td>
+          <td>{{ c | lines_text }}</td>
+          <td class="muted">{{ c.matchup | short_matchup }}</td>
+          <td>{{ c.reasons | reasons_html }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endmacro %}

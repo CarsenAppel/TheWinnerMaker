@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% import "_pickers.html" as pickers %}
+{% import "_player_card.html" as cards %}
+{% block title %}WinnerMaker - Player search{% endblock %}
+{% block content %}
+  <h1>Player search</h1>
+
+  {% if games is none %}
+    <div class="notice warning">No games to show.</div>
+  {% else %}
+    {{ pickers.week_picker('player_search_page', weeks, week_offset) }}
+
+    <form class="search-form" method="get" action="{{ url_for('player_search_page') }}">
+      <input type="hidden" name="week" value="{{ week_offset }}">
+      <label>Player name
+        <input type="search" name="q" value="{{ query }}" placeholder="e.g. mahomes">
+      </label>
+      <button type="submit">Search</button>
+    </form>
+
+    {% if not query %}
+      {% if candidate_count is defined %}
+        <p class="muted">{{ candidate_count }} players with props this week.</p>
+      {% endif %}
+    {% elif hits %}
+      {% if hits | length > 1 and pick_index is none %}
+        <div class="notice info">
+          {{ hits | length }} players matched. Pick one:
+        </div>
+        <div class="pills">
+          {% for c in hits %}
+            <a href="{{ url_for('player_search_page', week=week_offset, q=query, pick=loop.index0) }}">
+              {{ c.player }} ({{ c.matchup | short_matchup }})
+            </a>
+          {% endfor %}
+        </div>
+        <div class="pills">
+          <a class="active" href="{{ url_for('player_search_page', week=week_offset, q=query) }}">Show all</a>
+        </div>
+      {% endif %}
+      {% for c in hits %}
+        {{ cards.player_card(c, kickoffs.get(c.matchup, "")) }}
+      {% endfor %}
+    {% endif %}
+  {% endif %}
+{% endblock %}

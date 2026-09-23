@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% import "_pickers.html" as pickers %}
+{% import "_candidate_table.html" as tables %}
+{% block title %}WinnerMaker - Add / drop{% endblock %}
+{% block content %}
+  <h1>Gameday search</h1>
+
+  {% if games is none %}
+    <div class="notice warning">No games to show.</div>
+  {% else %}
+    {{ pickers.week_picker('add_drop_page', weeks, week_offset) }}
+    {{ pickers.day_picker('add_drop_page', by_day, day, week_offset) }}
+
+    {% if day %}
+      {% if candidate_count is defined %}
+        <p class="muted">{{ candidate_count }} players with props across {{ covered_count }} {{ day }} game(s).</p>
+
+        <form class="filter-form" method="get" action="{{ url_for('add_drop_page') }}">
+          <input type="hidden" name="week" value="{{ week_offset }}">
+          <input type="hidden" name="day" value="{{ day }}">
+          <label>Position
+            <select name="position">
+              <option value="" {{ "selected" if not position }}>Any</option>
+              {% for p in ["QB", "RB", "WR", "TE"] %}
+                <option value="{{ p }}" {{ "selected" if position == p }}>{{ p }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>Team abbreviation
+            <input type="text" name="team" value="{{ team }}" placeholder="ex: KC">
+          </label>
+          <label>Player name contains
+            <input type="text" name="name" value="{{ name }}">
+          </label>
+          <button type="submit">Apply filters</button>
+        </form>
+
+        {% if filters %}<p class="muted">Filters: {{ filters }}</p>{% endif %}
+
+        {% if not adds %}
+          <div class="notice warning">No players with props matched those filters.</div>
+        {% else %}
+          {{ tables.candidate_table("ADD / START candidates (top " ~ (adds | length) ~ ")", adds) }}
+
+          <h2>DROP / FADE candidates</h2>
+          {% if drops %}
+            {{ tables.candidate_table("DROP / FADE candidates", drops) }}
+          {% else %}
+            <div class="notice info">No drop/fade candidates flagged.</div>
+          {% endif %}
+
+          <p class="muted">
+            Score = book-implied fantasy pts (half-PPR, 6/TD) + Adj, where Adj sums
+            game-script and line-lean adjustments.
+          </p>
+        {% endif %}
+      {% endif %}
+    {% endif %}
+  {% endif %}
+{% endblock %}

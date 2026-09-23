@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}WinnerMaker{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <span class="brand">WinnerMaker</span>
+    <nav>
+      <a href="{{ url_for('home') }}">Home</a>
+      <a href="{{ url_for('odds_page') }}">Odds report</a>
+      <a href="{{ url_for('player_search_page') }}">Player search</a>
+      <a href="{{ url_for('schedule_page') }}">Schedule</a>
+      <a href="{{ url_for('add_drop_page') }}">Add / drop</a>
+      <a href="{{ url_for('team_page') }}">My team</a>
+      <a href="{{ url_for('help_page') }}">Help</a>
+    </nav>
+  </header>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <h3>Odds API requests this month</h3>
+      <div class="quota-metric">{{ quota.used }} / {{ quota.total }}</div>
+      {% if quota.adjustment %}
+        <div class="muted">({{ quota.auto_used }} tracked {{ "%+d" | format(quota.adjustment) }} adjusted)</div>
+      {% endif %}
+      <div class="progress"><div class="progress-bar" style="width: {{ (quota.pct * 100) | round(1) }}%"></div></div>
+
+      {% if quota.untracked %}
+        <div class="notice warning">
+          {{ quota.untracked | length }} odds-cache file(s) look like they came from
+          requests made outside this app, so they aren't counted above. Always fetch
+          odds through this app so the quota stays accurate.
+        </div>
+        <form method="post" action="{{ url_for('quota_reconcile') }}">
+          <button type="submit">Reconcile untracked requests</button>
+        </form>
+      {% endif %}
+
+      <details>
+        <summary>Manually adjust count</summary>
+        <p class="muted">Nudge this month's count without touching the automatic per-request log.</p>
+        <form method="post" action="{{ url_for('quota_adjust') }}">
+          <label>Adjustment
+            <input type="number" name="delta" value="0" step="1">
+          </label>
+          <label>Note (optional)
+            <input type="text" name="note">
+          </label>
+          <button type="submit">Apply adjustment</button>
+        </form>
+        {% if quota.history %}
+          <ul class="history">
+            {% for entry in quota.history %}
+              <li>{{ entry.at }}: {{ "%+d" | format(entry.delta) }}{% if entry.note %} - {{ entry.note }}{% endif %}</li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+      </details>
+    </aside>
+
+    <main>
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="flashes">
+            {% for category, message in messages %}
+              <div class="flash flash-{{ category }}">{{ message }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
+      {% if blocked %}
+        <div class="notice warning">
+          <code>{{ blocked.path }}</code> isn't cached. Fetching it will spend a request
+          ({{ blocked.remaining }} remaining this month).
+          <form method="post" action="{{ url_for('spend_request') }}" style="margin-top: 0.5rem;">
+            <input type="hidden" name="next" value="{{ request.url }}">
+            <button type="submit" class="primary">Spend a request and fetch</button>
+          </form>
+        </div>
+      {% endif %}
+
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</body>
+</html>

@@ -1,0 +1,21 @@
+{% macro week_picker(endpoint, weeks, week_offset, extra_args={}) %}
+  {% if weeks | length > 1 %}
+    <div class="week-picker">
+      {% for i in range(weeks | length) %}
+        {% set args = dict(extra_args, week=i) %}
+        <a class="button {{ 'primary' if i == week_offset }}" href="{{ url_for(endpoint, **args) }}">
+          {{ "This week" if i == 0 else "+" ~ i ~ " week(s) (Week " ~ weeks[i] ~ ")" }}
+        </a>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endmacro %}
+
+{% macro day_picker(endpoint, by_day, day, week_offset, extra_args={}) %}
+  <div class="pills">
+    {% for d in by_day %}
+      {% set args = dict(extra_args, week=week_offset, day=d) %}
+      <a class="{{ 'active' if d == day }}" href="{{ url_for(endpoint, **args) }}">{{ d }} ({{ by_day[d] | length }})</a>
+    {% endfor %}
+  </div>
+{% endmacro %}

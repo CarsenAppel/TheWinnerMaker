@@ -1,0 +1,101 @@
+{% macro player_card(c, kickoff="") %}
+  {% set verdict = c | verdict_text %}
+  <div class="player-card">
+    <header>
+      <span class="player-name">{{ c.player }}</span>
+      <span class="badge {{ c.position | pos_class }}">{{ c.position or "?" }}</span>
+      {% if c.team %}<span class="badge">{{ c.team }}</span>{% endif %}
+    </header>
+
+    <dl class="card-meta">
+      <dt>Game</dt>
+      <dd>{{ c.matchup }}{% if kickoff %} <span class="muted">{{ kickoff }}</span>{% endif %}</dd>
+
+      {% if c.game %}
+        <dt>Line</dt>
+        <dd>
+          {{ c.game.home }}
+          {{ "%+.1f" | format(c.game.home_spread) if c.game.home_spread is not none else "-" }}
+          &nbsp;O/U {{ "%.1f" | format(c.game.total) if c.game.total is not none else "-" }}
+          &nbsp;<strong>{{ c.game.favorite }} {{ "%.0f%%" | format(100 * (c.game.home_prob if c.game.home_prob >= c.game.away_prob else c.game.away_prob)) }}</strong>
+          {% for label in c.game.labels %}
+            <span class="{{ label | tag_class }}">{{ label }}</span>
+          {% endfor %}
+        </dd>
+      {% endif %}
+
+      <dt>Verdict</dt>
+      <dd>
+        <span class="{{ verdict | verdict_class }}">{{ verdict }}</span>
+        <strong>{{ "%.1f" | format(c.score) }} pts</strong>
+        <span class="muted">
+          ({{ "%.1f" | format(c.projection) }} book-implied
+          <span class="{{ c.adjustment | adj_class }}">{{ "%+.1f" | format(c.adjustment) }}</span>
+          adj)
+        </span>
+      </dd>
+    </dl>
+
+    {% set props = c | ordered_props %}
+    {% set td = c.props.get(ANYTIME_TD) %}
+    {% set multi_book = props | selectattr("other_books") | list | length > 0 %}
+    <table>
+      {% set prop_list = c.props.values() | list %}
+      <caption>Book lines{% if prop_list %} ({{ prop_list[0].bookmaker }} main lines){% endif %}</caption>
+      <thead>
+        <tr>
+          <th>Market</th><th>Line</th><th>Over / Under</th><th>Lean</th>
+          {% if multi_book %}<th>Other books</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in props %}
+          <tr>
+            <td>{{ p.label }}</td>
+            <td>{{ "%g" | format(p.line) }}</td>
+            <td>
+              O <span class="{{ p.over_american | price_class }}">{{ p.over_american or "n/a" }}</span>
+              &nbsp;U <span class="{{ p.under_american | price_class }}">{{ p.under_american or "n/a" }}</span>
+            </td>
+            <td><span class="{{ (p.lean | lean_text) | lean_class }}">{{ p.lean | lean_text }}</span></td>
+            {% if multi_book %}
+              <td>
+                {% if p.other_books %}
+                  {% for b in p.other_books %}
+                    <div>
+                      <span class="muted">{{ b.bookmaker }}</span>
+                      <span class="{{ 'other-book-line-changed' if b.line != p.line }}">{{ "%g" | format(b.line) }}</span>
+                      O <span class="{{ b.over_american | price_class }}">{{ b.over_american or "n/a" }}</span>
+                      / U <span class="{{ b.under_american | price_class }}">{{ b.under_american or "n/a" }}</span>
+                    </div>
+                  {% endfor %}
+                {% else %}
+                  <span class="muted">-</span>
+                {% endif %}
+              </td>
+            {% endif %}
+          </tr>
+        {% endfor %}
+        {% if td and td.over_price %}
+          <tr>
+            <td>Anytime TD</td>
+            <td><strong>{{ "%.0f%%" | format(100 * td.td_probability) }}</strong></td>
+            <td>
+              Yes <span class="{{ td.over_american | price_class }}">{{ td.over_american or "n/a" }}</span>
+              &nbsp;No <span class="{{ td.under_american | price_class }}">{{ td.under_american or "n/a" }}</span>
+            </td>
+            <td class="muted">-</td>
+            {% if multi_book %}<td></td>{% endif %}
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+
+    {% if c.reasons %}
+      <div class="reasons">
+        <strong>Why</strong>
+        {{ c.reasons | reasons_html }}
+      </div>
+    {% endif %}
+  </div>
+{% endmacro %}

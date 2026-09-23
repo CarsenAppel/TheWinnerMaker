@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}WinnerMaker - Odds report{% endblock %}
+{% block content %}
+  <h1>Odds analysis</h1>
+
+  <form method="post" action="{{ url_for('odds_refresh') }}">
+    <button type="submit">Force refresh (spends a request)</button>
+  </form>
+
+  {% if odds %}
+    {% if odds.age_seconds is not none %}
+      <p class="muted">
+        Odds data is {{ (odds.age_seconds / 3600) | round(1) }} hours old
+        ({{ odds.fixture_count }} fixtures).
+      </p>
+    {% endif %}
+
+    <div class="tabs">
+      <a href="{{ url_for('odds_page', tab='games') }}" class="{{ 'active' if tab == 'games' }}">Games</a>
+      <a href="{{ url_for('odds_page', tab='projections') }}" class="{{ 'active' if tab == 'projections' }}">Projections</a>
+      <a href="{{ url_for('odds_page', tab='td') }}" class="{{ 'active' if tab == 'td' }}">TD scorers</a>
+      <a href="{{ url_for('odds_page', tab='skew') }}" class="{{ 'active' if tab == 'skew' }}">Skew</a>
+    </div>
+
+    {% if tab == 'games' %}
+      {% if not games %}
+        <div class="notice info">No full-game markets found in the fetched fixtures.</div>
+      {% else %}
+        <table>
+          <caption>Game environments (sorted by spread)</caption>
+          <thead>
+            <tr>
+              <th>Date</th><th>Away</th><th>Home</th><th>Home Spread</th><th>O/U</th>
+              <th>Favorite</th><th>Win %</th><th>Spread Signal</th><th>Total Signal</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for g in games %}
+              <tr>
+                <td>{{ g.date }}</td>
+                <td>{{ g.away }}</td>
+                <td>{{ g.home }}</td>
+                <td>{{ g.home_spread }}</td>
+                <td>{{ g.total }}</td>
+                <td>{{ g.favorite }}</td>
+                <td>{{ g.win_pct }}</td>
+                <td><span class="{{ g.spread_tag | tag_class }}">{{ g.spread_tag }}</span></td>
+                <td><span class="{{ g.total_tag | tag_class }}">{{ g.total_tag }}</span></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% endif %}
+    {% elif tab == 'projections' %}
+      {% if not projections %}
+        <div class="notice info">No player props in the fetched data for this bookmaker.</div>
+      {% else %}
+        <table>
+          <caption>Book-implied projections</caption>
+          <thead>
+            <tr><th>Market</th><th>Player</th><th>Line</th><th>Over</th><th>Under</th><th>Lean</th><th>Matchup</th></tr>
+          </thead>
+          <tbody>
+            {% for p in projections %}
+              <tr>
+                <td>{{ p.market }}</td>
+                <td>{{ p.player }}</td>
+                <td>{{ p.line }}</td>
+                <td><span class="{{ p.over | price_class }}">{{ p.over }}</span></td>
+                <td><span class="{{ p.under | price_class }}">{{ p.under }}</span></td>
+                <td><span class="{{ p.lean | lean_class }}">{{ p.lean }}</span></td>
+                <td class="muted">{{ p.matchup | short_matchup }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% endif %}
+    {% elif tab == 'td' %}
+      {% if not td_scorers %}
+        <div class="notice info">No anytime-TD odds in the fetched data.</div>
+      {% else %}
+        <table>
+          <caption>Most likely to score a TD</caption>
+          <thead>
+            <tr><th>#</th><th>Player</th><th>TD %</th><th>Price</th><th>Matchup</th></tr>
+          </thead>
+          <tbody>
+            {% for p in td_scorers %}
+              <tr>
+                <td>{{ p.rank }}</td>
+                <td>{{ p.player }}</td>
+                <td>{{ p.td_pct }}</td>
+                <td><span class="{{ p.price | price_class }}">{{ p.price }}</span></td>
+                <td class="muted">{{ p.matchup | short_matchup }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% endif %}
+    {% elif tab == 'skew' %}
+      {% if not skewed %}
+        <div class="notice info">Skewed lines: no main lines priced far from even right now.</div>
+      {% else %}
+        <table>
+          <caption>Skewed lines - book leaning hard one way</caption>
+          <thead>
+            <tr><th>Player</th><th>Market</th><th>Line</th><th>Lean</th><th>Over</th><th>Under</th><th>Matchup</th></tr>
+          </thead>
+          <tbody>
+            {% for p in skewed %}
+              <tr>
+                <td>{{ p.player }}</td>
+                <td>{{ p.market }}</td>
+                <td>{{ p.line }}</td>
+                <td><span class="{{ p.lean | lean_class }}">{{ p.lean }}</span></td>
+                <td><span class="{{ p.over | price_class }}">{{ p.over }}</span></td>
+                <td><span class="{{ p.under | price_class }}">{{ p.under }}</span></td>
+                <td class="muted">{{ p.matchup | short_matchup }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% endif %}
+    {% endif %}
+  {% endif %}
+{% endblock %}

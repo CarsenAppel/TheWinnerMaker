@@ -612,20 +612,25 @@ def select_add_drop(
 ) -> tuple[list[PlayerCandidate], list[PlayerCandidate]]:
     """Filter candidates, then split into (adds, drops).
 
-    Adds: highest score. Drops: players the book expects little from or whose
-    game script works against them; single-prop players are ignored as noise.
+    Adds: players worth starting/adding (score above the drop ceiling).
+    Drops: players the book expects little from or whose game script works
+    against them; single-prop players are ignored as noise. The two lists are
+    computed independently, from opposite ends of the pool, so a small pool
+    doesn't let `adds` swallow every candidate and starve `drops`.
     """
     pool = [c for c in candidates if _matches(c, position, team, name)]
-    adds = sorted(pool, key=lambda c: c.score, reverse=True)[:limit]
-    added = {id(c) for c in adds}
+    drop_eligible = {
+        id(c)
+        for c in pool
+        if len(c.props) >= 2 and (c.adjustment < 0 or c.score < DROP_SCORE_CEILING)
+    }
+    adds = sorted(
+        (c for c in pool if id(c) not in drop_eligible),
+        key=lambda c: c.score,
+        reverse=True,
+    )[:limit]
     drops = sorted(
-        (
-            c
-            for c in pool
-            if id(c) not in added
-            and len(c.props) >= 2
-            and (c.adjustment < 0 or c.score < DROP_SCORE_CEILING)
-        ),
+        (c for c in pool if id(c) in drop_eligible),
         key=lambda c: (c.adjustment, c.score),
     )[:limit]
     return adds, drops

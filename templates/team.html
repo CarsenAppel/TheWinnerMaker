@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}WinnerMaker - My team{% endblock %}
+{% block content %}
+  <h1>My team</h1>
+
+  <form class="upload-form" method="post" action="{{ url_for('team_upload') }}" enctype="multipart/form-data">
+    <label>Upload team (JSON)
+      <input type="file" name="team_file" accept="application/json,.json">
+    </label>
+    <button type="submit" class="primary">Upload</button>
+  </form>
+
+  {% if team is none %}
+    <div class="notice info">No team uploaded yet.</div>
+  {% elif players %}
+    <table>
+      <thead>
+        <tr>
+          {% for col in players.columns %}<th>{{ col }}</th>{% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in players.rows %}
+          <tr>
+            {% for col in players.columns %}<td>{{ row.get(col, "") }}</td>{% endfor %}
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <pre>{{ raw_json }}</pre>
+  {% endif %}
+{% endblock %}

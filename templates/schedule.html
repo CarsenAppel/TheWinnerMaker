@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% import "_pickers.html" as pickers %}
+{% block title %}WinnerMaker - Schedule{% endblock %}
+{% block content %}
+  <h1>Upcoming games</h1>
+
+  {% if games is none %}
+    <div class="notice warning">No games to show.</div>
+  {% else %}
+    {{ pickers.week_picker('schedule_page', weeks, week_offset) }}
+
+    <h2>Week {{ games[0].week }}</h2>
+    {{ pickers.day_picker('schedule_page', by_day, day, week_offset) }}
+
+    {% if day and by_day[day] %}
+      <p class="muted">{{ by_day[day] | length }} game(s) on {{ day }}</p>
+      <table>
+        <caption>{{ day }} {{ by_day[day][0].gameday }}</caption>
+        <thead>
+          <tr><th>Kickoff (ET)</th><th>Away</th><th></th><th>Home</th></tr>
+        </thead>
+        <tbody>
+          {% for g in by_day[day] %}
+            <tr>
+              <td>{{ g.gametime }}</td>
+              <td>{{ g.away_name }}</td>
+              <td class="muted">@</td>
+              <td>{{ g.home_name }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
+  {% endif %}
+{% endblock %}
