@@ -1,4 +1,10 @@
-nfl_data_py==0.3.3
+# nfl_data_py's metadata claims numpy<2.0,pandas<2.0, but it actually works fine
+# with the newer pandas/numpy below (verified at runtime) - those bounds are just
+# stale in the published package. Install nfl_data_py with --no-deps so pip's
+# resolver doesn't reject the whole file over that stale constraint:
+#
+#   pip install --no-cache-dir -r requirements.txt
+#   pip install --no-cache-dir --no-deps nfl_data_py==0.3.3
 pandas==3.0.6
 numpy==2.5.3
 appdirs==1.4.4
