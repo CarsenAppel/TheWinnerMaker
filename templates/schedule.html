@@ -14,7 +14,7 @@
 
     {% if day and by_day[day] %}
       <p class="muted">{{ by_day[day] | length }} game(s) on {{ day }}</p>
-      <div class="table-responsive">
+      <div class="table-responsive stack-table">
       <table>
         <caption>{{ day }} {{ by_day[day][0].gameday }}</caption>
         <thead>
@@ -23,10 +23,10 @@
         <tbody>
           {% for g in by_day[day] %}
             <tr>
-              <td>{{ g.gametime }}</td>
-              <td>{{ g.away_name }}</td>
-              <td class="muted">@</td>
-              <td>{{ g.home_name }}</td>
+              <td data-label="Kickoff (ET)">{{ g.gametime }}</td>
+              <td data-label="Away">{{ g.away_name }}</td>
+              <td data-label="@" class="muted">@</td>
+              <td data-label="Home">{{ g.home_name }}</td>
             </tr>
           {% endfor %}
         </tbody>

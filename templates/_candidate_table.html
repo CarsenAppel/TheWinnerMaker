@@ -1,5 +1,5 @@
 {% macro candidate_table(title, rows) %}
-  <div class="table-responsive">
+  <div class="table-responsive stack-table">
   <table>
     <caption>{{ title }}</caption>
     <thead>
@@ -11,15 +11,15 @@
     <tbody>
       {% for c in rows %}
         <tr>
-          <td>{{ loop.index }}</td>
-          <td><strong>{{ c.player }}</strong></td>
-          <td class="{{ c.position | pos_class }}">{{ c.position or "?" }}</td>
-          <td>{{ c.team or "?" }}</td>
-          <td>{{ "%.1f" | format(c.score) }}</td>
-          <td><span class="{{ c.adjustment | adj_class }}">{{ "%+.1f" | format(c.adjustment) }}</span></td>
-          <td>{{ c | lines_text }}</td>
-          <td class="muted">{{ c.matchup | short_matchup }}</td>
-          <td>{{ c.reasons | reasons_html }}</td>
+          <td data-label="#">{{ loop.index }}</td>
+          <td data-label="Player"><strong>{{ c.player }}</strong></td>
+          <td data-label="Pos" class="{{ c.position | pos_class }}">{{ c.position or "?" }}</td>
+          <td data-label="Team">{{ c.team or "?" }}</td>
+          <td data-label="Score">{{ "%.1f" | format(c.score) }}</td>
+          <td data-label="Adj"><span class="{{ c.adjustment | adj_class }}">{{ "%+.1f" | format(c.adjustment) }}</span></td>
+          <td data-label="Book lines">{{ c | lines_text }}</td>
+          <td data-label="Matchup" class="muted">{{ c.matchup | short_matchup }}</td>
+          <td data-label="Why">{{ c.reasons | reasons_html }}</td>
         </tr>
       {% endfor %}
     </tbody>

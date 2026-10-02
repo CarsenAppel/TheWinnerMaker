@@ -39,7 +39,7 @@
     {% set props = c | ordered_props %}
     {% set td = c.props.get(ANYTIME_TD) %}
     {% set multi_book = props | selectattr("other_books") | list | length > 0 %}
-    <div class="table-responsive">
+    <div class="table-responsive stack-table">
     <table>
       {% set prop_list = c.props.values() | list %}
       <caption>Book lines{% if prop_list %} ({{ prop_list[0].bookmaker }} main lines){% endif %}</caption>
@@ -52,15 +52,15 @@
       <tbody>
         {% for p in props %}
           <tr>
-            <td>{{ p.label }}</td>
-            <td>{{ "%g" | format(p.line) }}</td>
-            <td>
+            <td data-label="Market">{{ p.label }}</td>
+            <td data-label="Line">{{ "%g" | format(p.line) }}</td>
+            <td data-label="Over / Under">
               O <span class="{{ p.over_american | price_class }}">{{ p.over_american or "n/a" }}</span>
               &nbsp;U <span class="{{ p.under_american | price_class }}">{{ p.under_american or "n/a" }}</span>
             </td>
-            <td><span class="{{ (p.lean | lean_text) | lean_class }}">{{ p.lean | lean_text }}</span></td>
+            <td data-label="Lean"><span class="{{ (p.lean | lean_text) | lean_class }}">{{ p.lean | lean_text }}</span></td>
             {% if multi_book %}
-              <td>
+              <td data-label="Other books">
                 {% if p.other_books %}
                   {% for b in p.other_books %}
                     <div>
@@ -79,14 +79,14 @@
         {% endfor %}
         {% if td and td.over_price %}
           <tr>
-            <td>Anytime TD</td>
-            <td><strong>{{ "%.0f%%" | format(100 * td.td_probability) }}</strong></td>
-            <td>
+            <td data-label="Market">Anytime TD</td>
+            <td data-label="Line"><strong>{{ "%.0f%%" | format(100 * td.td_probability) }}</strong></td>
+            <td data-label="Over / Under">
               Yes <span class="{{ td.over_american | price_class }}">{{ td.over_american or "n/a" }}</span>
               &nbsp;No <span class="{{ td.under_american | price_class }}">{{ td.under_american or "n/a" }}</span>
             </td>
-            <td class="muted">-</td>
-            {% if multi_book %}<td></td>{% endif %}
+            <td data-label="Lean" class="muted">-</td>
+            {% if multi_book %}<td data-label="Other books"></td>{% endif %}
           </tr>
         {% endif %}
       </tbody>

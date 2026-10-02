@@ -13,7 +13,7 @@
   {% if team is none %}
     <div class="notice info">No team uploaded yet.</div>
   {% elif players %}
-    <div class="table-responsive">
+    <div class="table-responsive stack-table">
     <table>
       <thead>
         <tr>
@@ -23,7 +23,7 @@
       <tbody>
         {% for row in players.rows %}
           <tr>
-            {% for col in players.columns %}<td>{{ row.get(col, "") }}</td>{% endfor %}
+            {% for col in players.columns %}<td data-label="{{ col }}">{{ row.get(col, "") }}</td>{% endfor %}
           </tr>
         {% endfor %}
       </tbody>

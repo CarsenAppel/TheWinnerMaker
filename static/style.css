@@ -355,6 +355,10 @@ table {
   min-width: 560px;
 }
 
+.table-responsive.stack-table table {
+  min-width: 0;
+}
+
 caption {
   text-align: left;
   padding: 0.5rem 0.75rem;
@@ -695,6 +699,103 @@ tr:last-child td {
   td {
     padding: 0.45rem 0.6rem;
     font-size: 0.9rem;
+  }
+
+  /* Stacked table pattern: each row becomes a card, each cell becomes a
+     labeled line, instead of forcing horizontal scroll to see all columns. */
+  .stack-table {
+    overflow-x: visible;
+  }
+
+  .stack-table table {
+    width: 100%;
+    border: none;
+    background: transparent;
+  }
+
+  .stack-table caption {
+    background: transparent;
+    padding: 0 0 0.5rem;
+    font-size: 1rem;
+  }
+
+  .stack-table thead {
+    display: none;
+  }
+
+  .stack-table tbody {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .stack-table tr {
+    display: block;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    padding: 0.5rem 0.75rem;
+  }
+
+  .stack-table td {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.25rem 0.75rem;
+    padding: 0.4rem 0;
+    border-bottom: 1px solid var(--color-border);
+    white-space: normal;
+    text-align: right;
+  }
+
+  .stack-table td:last-child {
+    border-bottom: none;
+  }
+
+  .stack-table td::before {
+    content: attr(data-label);
+    color: var(--color-muted);
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    text-align: left;
+    flex: 1 0 auto;
+  }
+
+  .stack-table td > * {
+    flex: 1 1 auto;
+    text-align: right;
+    min-width: 0;
+  }
+
+  .stack-table td[data-label="Other books"],
+  .stack-table td[data-label="Why"] {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .stack-table td[data-label="Other books"]::before,
+  .stack-table td[data-label="Why"]::before {
+    margin-bottom: 0.15rem;
+  }
+
+  .stack-table td[data-label="Other books"] > *,
+  .stack-table td[data-label="Why"] > * {
+    text-align: left;
+  }
+
+  .stack-table td[data-label="Other books"] div {
+    padding: 0.2rem 0;
+    border-top: 1px dashed var(--color-border);
+  }
+
+  .stack-table td[data-label="Other books"] div:first-child {
+    border-top: none;
+  }
+
+  .stack-table td:empty {
+    display: none;
   }
 
   .player-card {
