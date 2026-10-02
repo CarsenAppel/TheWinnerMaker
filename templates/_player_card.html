@@ -39,6 +39,7 @@
     {% set props = c | ordered_props %}
     {% set td = c.props.get(ANYTIME_TD) %}
     {% set multi_book = props | selectattr("other_books") | list | length > 0 %}
+    <div class="table-responsive">
     <table>
       {% set prop_list = c.props.values() | list %}
       <caption>Book lines{% if prop_list %} ({{ prop_list[0].bookmaker }} main lines){% endif %}</caption>
@@ -90,6 +91,7 @@
         {% endif %}
       </tbody>
     </table>
+    </div>
 
     {% if c.reasons %}
       <div class="reasons">

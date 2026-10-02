@@ -9,7 +9,10 @@
 <body>
   <header class="topbar">
     <span class="brand">WinnerMaker</span>
-    <nav>
+    <button type="button" class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false" aria-controls="primary-nav" onclick="document.getElementById('primary-nav').classList.toggle('open'); this.setAttribute('aria-expanded', document.getElementById('primary-nav').classList.contains('open'));">
+      <span></span><span></span><span></span>
+    </button>
+    <nav id="primary-nav">
       <a href="{{ url_for('home') }}">Home</a>
       <a href="{{ url_for('odds_page') }}">Odds report</a>
       <a href="{{ url_for('player_search_page') }}">Player search</a>

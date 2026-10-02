@@ -14,6 +14,7 @@
 
     {% if day and by_day[day] %}
       <p class="muted">{{ by_day[day] | length }} game(s) on {{ day }}</p>
+      <div class="table-responsive">
       <table>
         <caption>{{ day }} {{ by_day[day][0].gameday }}</caption>
         <thead>
@@ -30,6 +31,7 @@
           {% endfor %}
         </tbody>
       </table>
+      </div>
     {% endif %}
   {% endif %}
 {% endblock %}

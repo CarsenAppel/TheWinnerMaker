@@ -13,6 +13,7 @@
   {% if team is none %}
     <div class="notice info">No team uploaded yet.</div>
   {% elif players %}
+    <div class="table-responsive">
     <table>
       <thead>
         <tr>
@@ -27,6 +28,7 @@
         {% endfor %}
       </tbody>
     </table>
+    </div>
   {% else %}
     <pre>{{ raw_json }}</pre>
   {% endif %}

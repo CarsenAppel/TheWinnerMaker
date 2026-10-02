@@ -26,6 +26,7 @@
       {% if not games %}
         <div class="notice info">No full-game markets found in the fetched fixtures.</div>
       {% else %}
+        <div class="table-responsive">
         <table>
           <caption>Game environments (sorted by spread)</caption>
           <thead>
@@ -50,11 +51,13 @@
             {% endfor %}
           </tbody>
         </table>
+        </div>
       {% endif %}
     {% elif tab == 'projections' %}
       {% if not projections %}
         <div class="notice info">No player props in the fetched data for this bookmaker.</div>
       {% else %}
+        <div class="table-responsive">
         <table>
           <caption>Book-implied projections</caption>
           <thead>
@@ -74,11 +77,13 @@
             {% endfor %}
           </tbody>
         </table>
+        </div>
       {% endif %}
     {% elif tab == 'td' %}
       {% if not td_scorers %}
         <div class="notice info">No anytime-TD odds in the fetched data.</div>
       {% else %}
+        <div class="table-responsive">
         <table>
           <caption>Most likely to score a TD</caption>
           <thead>
@@ -96,11 +101,13 @@
             {% endfor %}
           </tbody>
         </table>
+        </div>
       {% endif %}
     {% elif tab == 'skew' %}
       {% if not skewed %}
         <div class="notice info">Skewed lines: no main lines priced far from even right now.</div>
       {% else %}
+        <div class="table-responsive">
         <table>
           <caption>Skewed lines - book leaning hard one way</caption>
           <thead>
@@ -120,6 +127,7 @@
             {% endfor %}
           </tbody>
         </table>
+        </div>
       {% endif %}
     {% endif %}
   {% endif %}
