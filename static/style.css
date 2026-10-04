@@ -286,6 +286,25 @@ textarea {
   resize: vertical;
 }
 
+.roster-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  align-items: stretch;
+}
+
+.roster-form label {
+  width: 100%;
+}
+
+.roster-form input[type="text"] {
+  width: 100%;
+}
+
+.roster-form button {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
+
 .filter-form,
 .search-form,
 .pick-form,

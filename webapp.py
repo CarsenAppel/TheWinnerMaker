@@ -28,11 +28,13 @@ app.secret_key = "winnermaker-dev-secret"  # local single-user app; no real sess
 
 HEADER = "The WinnerMaker"
 INSTRUCTIONS = (
-    "Paste your roster as a plain list of player names, one per line. "
-    "WinnerMaker will use this and flag specific events for these players."
+    "On the My team page, type a player name into each roster slot (QB, RB1, "
+    "WR1, FLEX, etc.). WinnerMaker looks up cached odds for each player and "
+    "flags specific events for them."
 )
 BOOKMAKER = "pinnacle"
 TEAM_FILE = Path("data/team.json")
+ROSTER_ROLES = ["QB", "RB1", "RB2", "WR1", "WR2", "TE", "FLEX", "K", "DST"]
 
 ODDS_ERRORS = (oddsApi.OddsApiError, KeyError, TypeError, ValueError)
 
@@ -385,6 +387,53 @@ def build_candidates(
     return candidates, covered
 
 
+def all_candidates() -> list[analysis.PlayerCandidate] | None:
+    """Candidates across every currently cached game (no week/day filter).
+
+    Used by the roster page, which looks players up by name rather than by
+    matchup. Returns None (after flashing why) if odds aren't available.
+    """
+    session["blocked_request"] = None
+    try:
+        odds = _fetch_odds(force_refresh=False)
+    except ODDS_ERRORS as exc:
+        report_odds_error(exc)
+        return None
+    finally:
+        session["allow_live"] = False
+
+    if not odds.games:
+        return []
+
+    try:
+        index = apiConnect.build_player_index()
+    except apiConnect.NflDataError:
+        index = {}
+
+    def lookup(name: str) -> tuple[str, str] | None:
+        info = apiConnect.lookup_player(index, name)
+        return (info.team, info.position) if info else None
+
+    matchups = {g.matchup for g in odds.games}
+    candidates = analysis.build_candidates(odds.props, odds.games, matchups, lookup)
+    for c in candidates:
+        c.player = apiConnect.display_player_name(c.player)
+    return candidates
+
+
+def find_player(candidates: list[analysis.PlayerCandidate], name: str) -> analysis.PlayerCandidate | None:
+    """Best match for a typed roster name: exact (case-insensitive) match first,
+    then whatever `search_players` ranks highest."""
+    name = name.strip()
+    if not name:
+        return None
+    for c in candidates:
+        if c.player.lower() == name.lower():
+            return c
+    hits = analysis.search_players(candidates, name)
+    return hits[0] if hits else None
+
+
 def quota_context() -> dict[str, Any]:
     auto_used = oddsApi.requests_used_this_month()
     adjustment = oddsApi.manual_adjustment_this_month()
@@ -633,31 +682,48 @@ def add_drop_page() -> str:
 # --------------------------------------------------------------------------- #
 # My team
 # --------------------------------------------------------------------------- #
+def load_roster() -> dict[str, str]:
+    if not TEAM_FILE.exists():
+        return {}
+    try:
+        team = json.loads(TEAM_FILE.read_text())
+    except json.JSONDecodeError:
+        return {}
+    roster = team.get("roster", {}) if isinstance(team, dict) else {}
+    return roster if isinstance(roster, dict) else {}
+
+
 @app.get("/team")
 def team_page() -> str:
-    team = None
-    if TEAM_FILE.exists():
-        try:
-            team = json.loads(TEAM_FILE.read_text())
-        except json.JSONDecodeError:
-            team = None
-    players = team.get("players", []) if isinstance(team, dict) else []
-    roster_text = "\n".join(players)
-    return render_template("team.html", players=players, roster_text=roster_text)
+    roster = load_roster()
+    filled = {role: name for role, name in roster.items() if name}
+
+    candidates = all_candidates() if filled else []
+    slots = []
+    for role in ROSTER_ROLES:
+        name = roster.get(role, "")
+        match = find_player(candidates or [], name) if name else None
+        slots.append({"role": role, "name": name, "candidate": match})
+        if name and candidates is not None and match is None:
+            flash(f"No cached odds for '{name}' ({role}) yet.", "warning")
+
+    return render_template("team.html", slots=slots)
 
 
 @app.post("/team/upload")
 def team_upload() -> Any:
-    raw_text = request.form.get("roster_text", "")
-    players = [line.strip() for line in raw_text.splitlines() if line.strip()]
-    # De-duplicate while preserving order.
-    players = list(dict.fromkeys(players))
-    if not players:
-        flash("Enter at least one player name.", "warning")
-        return redirect(url_for("team_page"))
+    roster = {}
+    for role in ROSTER_ROLES:
+        name = request.form.get(f"role_{role}", "").strip()
+        if name:
+            roster[role] = name
     TEAM_FILE.parent.mkdir(parents=True, exist_ok=True)
-    TEAM_FILE.write_text(json.dumps({"players": players}, indent=2))
-    flash(f"Team saved ({len(players)} player{'s' if len(players) != 1 else ''}).", "success")
+    TEAM_FILE.write_text(json.dumps({"roster": roster}, indent=2))
+    count = len(roster)
+    if count:
+        flash(f"Roster saved ({count} player{'s' if count != 1 else ''}).", "success")
+    else:
+        flash("Roster cleared.", "info")
     return redirect(url_for("team_page"))
 
 

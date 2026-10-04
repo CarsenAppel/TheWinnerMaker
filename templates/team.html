@@ -1,31 +1,25 @@
 {% extends "base.html" %}
+{% import "_player_card.html" as cards %}
 {% block title %}WinnerMaker - My team{% endblock %}
 {% block content %}
   <h1>My team</h1>
+  <p class="muted">Type a player name for each roster spot. Odds are pulled from the cache automatically (or queued for a refresh if missing).</p>
 
-  <form class="upload-form" method="post" action="{{ url_for('team_upload') }}">
-    <label>Roster (one player per line)
-      <textarea name="roster_text" rows="10" placeholder="Patrick Mahomes
-Travis Kelce
-Tyreek Hill">{{ roster_text }}</textarea>
-    </label>
+  <form class="upload-form roster-form" method="post" action="{{ url_for('team_upload') }}">
+    {% for slot in slots %}
+      <label>{{ slot.role }}
+        <input type="text" name="role_{{ slot.role }}" value="{{ slot.name }}" placeholder="Player name">
+      </label>
+    {% endfor %}
     <button type="submit" class="primary">Save roster</button>
   </form>
 
-  {% if not players %}
-    <div class="notice info">No team uploaded yet.</div>
-  {% else %}
-    <div class="table-responsive stack-table">
-    <table>
-      <thead>
-        <tr><th>Player</th></tr>
-      </thead>
-      <tbody>
-        {% for name in players %}
-          <tr><td data-label="Player">{{ name }}</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    </div>
-  {% endif %}
+  {% for slot in slots if slot.name %}
+    <h2>{{ slot.role }}: {{ slot.name }}</h2>
+    {% if slot.candidate %}
+      {{ cards.player_card(slot.candidate) }}
+    {% else %}
+      <div class="notice warning">No cached odds found for "{{ slot.name }}" yet.</div>
+    {% endif %}
+  {% endfor %}
 {% endblock %}
