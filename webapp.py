@@ -28,8 +28,8 @@ app.secret_key = "winnermaker-dev-secret"  # local single-user app; no real sess
 
 HEADER = "The WinnerMaker"
 INSTRUCTIONS = (
-    "For uploading a team please use JSON format. WinnerMaker will use this and "
-    "flag specific events for these players."
+    "Paste your roster as a plain list of player names, one per line. "
+    "WinnerMaker will use this and flag specific events for these players."
 )
 BOOKMAKER = "pinnacle"
 TEAM_FILE = Path("data/team.json")
@@ -537,7 +537,7 @@ def player_search_page() -> str:
             query="",
         )
     candidates, _covered = built
-    kickoffs = {g.matchup: f"{g.weekday} {g.gametime} ET" for g in games}
+    kickoffs = {g.matchup: f"{g.weekday} {g.gametime_mst} MST" for g in games}
 
     query = request.args.get("q", "").strip()
     hits: list[analysis.PlayerCandidate] = []
@@ -641,34 +641,23 @@ def team_page() -> str:
             team = json.loads(TEAM_FILE.read_text())
         except json.JSONDecodeError:
             team = None
-    players = None
-    if team is not None:
-        raw_players = team.get("players", team) if isinstance(team, dict) else team
-        if isinstance(raw_players, list) and raw_players and all(
-            isinstance(p, dict) for p in raw_players
-        ):
-            columns = list(dict.fromkeys(k for p in raw_players for k in p))
-            players = {"columns": columns, "rows": raw_players}
-        elif isinstance(raw_players, list):
-            players = {"columns": ["player"], "rows": [{"player": p} for p in raw_players]}
-    raw_json = json.dumps(team, indent=2) if team is not None and players is None else None
-    return render_template("team.html", team=team, players=players, raw_json=raw_json)
+    players = team.get("players", []) if isinstance(team, dict) else []
+    roster_text = "\n".join(players)
+    return render_template("team.html", players=players, roster_text=roster_text)
 
 
 @app.post("/team/upload")
 def team_upload() -> Any:
-    upload = request.files.get("team_file")
-    if upload is None or not upload.filename:
-        flash("Choose a JSON file to upload.", "warning")
-        return redirect(url_for("team_page"))
-    try:
-        data = json.load(upload.stream)
-    except json.JSONDecodeError as exc:
-        flash(f"That file isn't valid JSON: {exc}", "error")
+    raw_text = request.form.get("roster_text", "")
+    players = [line.strip() for line in raw_text.splitlines() if line.strip()]
+    # De-duplicate while preserving order.
+    players = list(dict.fromkeys(players))
+    if not players:
+        flash("Enter at least one player name.", "warning")
         return redirect(url_for("team_page"))
     TEAM_FILE.parent.mkdir(parents=True, exist_ok=True)
-    TEAM_FILE.write_text(json.dumps(data, indent=2))
-    flash("Team saved.", "success")
+    TEAM_FILE.write_text(json.dumps({"players": players}, indent=2))
+    flash(f"Team saved ({len(players)} player{'s' if len(players) != 1 else ''}).", "success")
     return redirect(url_for("team_page"))
 
 

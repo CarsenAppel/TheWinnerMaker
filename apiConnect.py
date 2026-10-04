@@ -11,9 +11,10 @@ import time
 import unicodedata
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, cast
+from zoneinfo import ZoneInfo
 
 import nfl_data_py as nfl
 import pandas as pd
@@ -26,6 +27,24 @@ TTL_FOREVER = None
 
 SKILL_POSITIONS = ("QB", "RB", "WR", "TE")
 DAY_ORDER = ["Thursday", "Friday", "Saturday", "Sunday", "Monday", "Tuesday", "Wednesday"]
+
+_EASTERN = ZoneInfo("America/New_York")
+_MST = timezone(timedelta(hours=-7))  # fixed Mountain Standard Time, no DST (e.g. Arizona)
+
+
+def _eastern_to_mst(gameday: str, gametime: str) -> datetime:
+    """Combine the schedule's Eastern gameday/gametime into an MST-aware datetime.
+
+    `nfl_data_py` reports kickoff as US Eastern wall-clock time (EDT or EST
+    depending on the date), so the conversion has to localize to
+    `America/New_York` first to pick the right offset before shifting to the
+    fixed UTC-7 MST offset. Late games can roll over to the next calendar day
+    in MST, which is why this returns a full datetime rather than separate
+    strings.
+    """
+    naive = datetime.strptime(f"{gameday} {gametime}", "%Y-%m-%d %H:%M")
+    eastern = naive.replace(tzinfo=_EASTERN)
+    return eastern.astimezone(_MST)
 
 
 class NflDataError(RuntimeError):
@@ -130,8 +149,8 @@ def get_weekly_stats(season: int = SEASON) -> pd.DataFrame:
 class ScheduledGame:
     game_id: str
     week: int
-    gameday: str  # YYYY-MM-DD
-    weekday: str  # e.g. "Sunday"
+    gameday: str  # YYYY-MM-DD, Eastern
+    weekday: str  # e.g. "Sunday", Eastern
     gametime: str  # HH:MM Eastern
     away: str  # abbreviation
     home: str
@@ -141,6 +160,23 @@ class ScheduledGame:
     @property
     def matchup(self) -> str:
         return f"{self.away_name} @ {self.home_name}"
+
+    @property
+    def kickoff_mst(self) -> datetime:
+        """Kickoff as an MST-aware datetime (fixed UTC-7, no DST)."""
+        return _eastern_to_mst(self.gameday, self.gametime)
+
+    @property
+    def gameday_mst(self) -> str:
+        return self.kickoff_mst.strftime("%Y-%m-%d")
+
+    @property
+    def weekday_mst(self) -> str:
+        return self.kickoff_mst.strftime("%A")
+
+    @property
+    def gametime_mst(self) -> str:
+        return self.kickoff_mst.strftime("%H:%M")
 
 
 def _unplayed_games(season: int, today: date) -> list[Record]:

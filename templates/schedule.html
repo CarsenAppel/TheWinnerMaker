@@ -18,12 +18,12 @@
       <table>
         <caption>{{ day }} {{ by_day[day][0].gameday }}</caption>
         <thead>
-          <tr><th>Kickoff (ET)</th><th>Away</th><th></th><th>Home</th></tr>
+          <tr><th>Kickoff (MST)</th><th>Away</th><th></th><th>Home</th></tr>
         </thead>
         <tbody>
           {% for g in by_day[day] %}
             <tr>
-              <td data-label="Kickoff (ET)">{{ g.gametime }}</td>
+              <td data-label="Kickoff (MST)">{{ g.gametime_mst }}</td>
               <td data-label="Away">{{ g.away_name }}</td>
               <td data-label="@" class="muted">@</td>
               <td data-label="Home">{{ g.home_name }}</td>
