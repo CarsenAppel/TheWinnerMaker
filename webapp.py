@@ -34,7 +34,10 @@ INSTRUCTIONS = (
 )
 BOOKMAKER = "pinnacle"
 TEAM_FILE = Path("data/team.json")
-ROSTER_ROLES = ["QB", "RB1", "RB2", "WR1", "WR2", "TE", "FLEX", "K", "DST"]
+ROSTER_ROLES = [
+    "QB", "RB1", "RB2", "WR1", "WR2", "TE", "FLEX", "K", "DST",
+    "BENCH1", "BENCH2", "BENCH3", "BENCH4", "BENCH5", "BENCH6", "BENCH7",
+]
 
 ODDS_ERRORS = (oddsApi.OddsApiError, KeyError, TypeError, ValueError)
 
